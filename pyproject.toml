@@ -8,8 +8,12 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "ipykernel>=7.3.0",
+    "jupyter>=1.1.1",
+    "matplotlib>=3.11.2",
     "pandas>=3.0.5",
     "plotly>=7.0.0",
+    "pygments>=2.21.0",
     "streamlit>=1.63.0",
 ]
 
