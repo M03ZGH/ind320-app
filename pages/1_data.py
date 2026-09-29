@@ -4,13 +4,35 @@ import pandas as pd
 
 @st.cache_data
 def load_data():
-    """Load the reservoir data from the local CSV file."""
-    return pd.read_csv("data/reservoirs.csv")
+    """Load and prepare the reservoir data."""
+    df = pd.read_csv("data/reservoirs.csv")
+
+    df = df.rename(columns={
+        "dato_Id": "date",
+        "omrType": "area_type",
+        "omrnr": "area_number",
+        "iso_aar": "year",
+        "iso_uke": "week",
+        "fyllingsgrad": "filling_degree",
+        "kapasitet_TWh": "capacity_TWh",
+        "fylling_TWh": "filled_TWh",
+        "neste_Publiseringsdato": "next_publication_date",
+        "fyllingsgrad_forrige_uke": "filling_degree_previous_week",
+        "endring_fyllingsgrad": "change_filling_degree"
+    })
+
+    df["date"] = pd.to_datetime(df["date"])
+    df["next_publication_date"] = pd.to_datetime(
+        df["next_publication_date"],
+        errors="coerce"
+    )
+
+    return df
 
 
 df = load_data()
 
-df["dato_Id"] = pd.to_datetime(df["dato_Id"])
+df["date"] = pd.to_datetime(df["date"])
 
 st.title("Reservoir Data")
 
@@ -21,11 +43,11 @@ st.write(
 )
 
 # Identify the first month in the dataset
-first_month = df["dato_Id"].min().to_period("M")
+first_month = df["date"].min().to_period("M")
 
 first_month_df = df[
-    df["dato_Id"].dt.to_period("M") == first_month
-].sort_values("dato_Id")
+    df["date"].dt.to_period("M") == first_month
+].sort_values("date")
 
 # Create one row for each column in the imported data
 table_data = []
