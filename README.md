@@ -24,7 +24,7 @@ The interactive application provides:
 * Selection of a period of months for the visualization.
 
 **Live application:**
-[Add Streamlit URL here]
+https://ind320-app-wktckrzn7uk2axexipgwwq.streamlit.app
 
 ## Technologies
 
@@ -34,6 +34,7 @@ The interactive application provides:
 * Streamlit
 * Jupyter Notebook
 * uv
+* GitHub
 
 ## Data
 
@@ -41,8 +42,8 @@ The project uses reservoir data containing information such as filling degree, r
 
 ## AI usage
 
-AI tools were used as a support tool throughout the project. They were used to help understand Python and Streamlit functionality, troubleshoot technical issues, discuss possible approaches to data analysis and visualization, and improve code structure and readability.
+AI tools were used as support throughout the project for both programming and writing.
 
-AI was also used to support the writing process, including improving the structure, wording and clarity of project documentation.
+Claude Code was used at the beginning of the project to help understand the course structure, project requirements and development workflow. During implementation, AI was used to understand Python and Streamlit functionality, troubleshoot technical issues, discuss visualization approaches and improve code structure. GitHub Copilot also provided coding suggestions during development.
 
-All suggestions were reviewed and adapted to the project requirements, and the code was tested before submission.
+AI was additionally used as a writing support tool to improve the wording, structure and clarity of project documentation and other written sections. AI-generated suggestions were reviewed and adapted to the project requirements, and the final code and content were tested and reviewed before submission.
