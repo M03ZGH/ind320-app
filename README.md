@@ -141,6 +141,15 @@ data pipeline and improve Python and Streamlit structure. I reviewed and adapted
 all suggestions and tested the resulting code. Secrets remain in local
 Streamlit configuration and are excluded from GitHub.
 
+### Submission video note
+
+Because the live ENTSO-E requests took more than 70 minutes and the MongoDB
+upload could not be completed before the deadline, the submission video
+demonstrates the local Streamlit application. Streamlit Cloud, Cloud Secrets
+and the MongoDB collection can be checked and completed separately after the
+submission. The local demonstration shows the API-backed NVE pages, area-type
+selection, interval slider and reservoir visualisations.
+
 ## AI usage
 
 AI tools were used as support throughout the project for both programming and writing.
