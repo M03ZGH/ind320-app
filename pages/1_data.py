@@ -4,6 +4,7 @@ import streamlit as st
 
 from ind320_app.data import load_reservoir_data
 
+# This page deliberately fetches NVE data instead of reading the old Part 1 CSV.
 st.title("NVE reservoir data")
 st.caption("The data is fetched directly from the NVE Magasinstatistikk API.")
 
@@ -15,6 +16,8 @@ interval = st.slider(
     step=4,
 )
 
+# Network errors are shown in the app so a failed API request is not mistaken
+# for an empty dataset.
 try:
     data = load_reservoir_data()
 except Exception as exc:
@@ -22,6 +25,7 @@ except Exception as exc:
     st.stop()
 
 latest = data["date"].max()
+# The slider controls how many recent weeks remain visible after the API fetch.
 filtered = data[data["date"] >= latest - pd.Timedelta(weeks=interval)]
 area_type = st.radio("Area type", ["EL", "NO", "VASS"], horizontal=True)
 area_data = filtered[filtered["area_type"] == area_type]
@@ -40,6 +44,7 @@ measure = st.selectbox(
     format_func=lambda value: value.replace("_", " ").title(),
 )
 chart_data = area_data[["date", "area_number", measure]].dropna()
+# Plotly gives each NVE area number its own line for the selected area type.
 st.plotly_chart(
     px.line(
         chart_data.sort_values("date"),

@@ -30,6 +30,7 @@ NVE_COLUMNS = {
 
 def load_reservoir_data(timeout: int = 60) -> pd.DataFrame:
     """Fetch and normalize the complete public NVE reservoir dataset."""
+    # Use a timeout so a temporary API problem cannot leave Streamlit hanging.
     response = requests.get(NVE_URL, timeout=timeout)
     response.raise_for_status()
     payload: Any = response.json()
@@ -49,6 +50,7 @@ def load_reservoir_data(timeout: int = 60) -> pd.DataFrame:
         frame["next_publication_date"] = pd.to_datetime(
             frame["next_publication_date"], format="mixed", errors="coerce"
         )
+    # Preserve text columns while converting numeric API fields where possible.
     for column in frame.columns:
         if column not in {"date", "next_publication_date", "area_type"}:
             converted = pd.to_numeric(frame[column], errors="coerce")
@@ -67,6 +69,7 @@ def clean_flow_data(frame: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"Flow data is missing columns: {sorted(missing)}")
 
     result = frame.copy()
+    # UTC makes observations from different bidding zones comparable.
     result["timestamp"] = pd.to_datetime(result["timestamp"], utc=True, errors="coerce")
     result["flow_mw"] = pd.to_numeric(result["flow_mw"], errors="coerce")
     result = result.dropna(
@@ -90,6 +93,7 @@ def fetch_entsoe_flows(
     """Fetch both directions for each connection, using at most one-year windows."""
     frames: list[pd.DataFrame] = []
     window_start = start
+    # ENTSO-E requests are split into one-year windows to stay within API limits.
     while window_start < end:
         window_end = min(window_start + pd.DateOffset(years=1), end)
         for no_zone, neighbour_zone, connection in connections:
@@ -123,6 +127,7 @@ def annual_energy_by_direction(
 ) -> pd.DataFrame:
     """Estimate annual MWh from hourly MW observations for one connection."""
     selected = flows[(flows["connection"] == connection) & (flows["year"] == year)]
+    # For hourly observations, MW multiplied by one hour gives an MWh estimate.
     return (
         selected.assign(energy_mwh=selected["flow_mw"])
         .groupby("direction", as_index=False)["energy_mwh"]

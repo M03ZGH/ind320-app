@@ -1,5 +1,6 @@
 import streamlit as st
 
+# Configure the shared layout before rendering any page content.
 st.set_page_config(
     page_title="IND320 Data to Decision",
     page_icon="💧",
@@ -13,6 +14,7 @@ st.markdown(
 )
 
 st.subheader("Project overview")
+# The sidebar pages contain the API-backed reservoir view and MongoDB flow view.
 st.write(
     "Use the pages in the sidebar to fetch current reservoir data from NVE, "
     "inspect the required NVE area types (EL, NO and VASS), and explore ENTSO-E flow data "

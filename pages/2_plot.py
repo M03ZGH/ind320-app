@@ -4,6 +4,8 @@ import streamlit as st
 
 from ind320_app.data import load_reservoir_data
 
+# Capacity is not offered here because it is mostly constant and is not useful
+# as a time-series measure.
 st.title("Reservoir development")
 st.write("Choose an area type and a download interval to compare reservoir measures.")
 
@@ -14,6 +16,7 @@ measure = st.selectbox(
     ["filling_degree", "filled_TWh", "change_filling_degree"],
 )
 
+# Keep the error visible to the user when the public API is unavailable.
 try:
     data = load_reservoir_data()
 except Exception as exc:
@@ -30,6 +33,7 @@ if filtered.empty:
     st.stop()
 
 figure, axis = plt.subplots(figsize=(11, 5))
+# Compare the development of each area number over the selected interval.
 for area_number, group in filtered.groupby("area_number"):
     axis.plot(group["date"], group[measure], label=str(area_number))
 axis.set_title(f"{measure.replace('_', ' ').title()} – {area_type}")

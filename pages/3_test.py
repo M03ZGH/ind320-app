@@ -1,5 +1,6 @@
 import streamlit as st
 
+# This page documents the purpose and development method of the application.
 st.title("About this project")
 st.write(
     "This application is the online part of the IND320 Data to Decision project "
