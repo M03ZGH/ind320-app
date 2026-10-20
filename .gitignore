@@ -3,3 +3,5 @@ __pycache__/
 .DS_Store
 .streamlit/secrets.toml
 *.env
+# Don't sync folder No_sync
+No_sync
