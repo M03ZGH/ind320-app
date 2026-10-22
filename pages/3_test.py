@@ -1,22 +1,15 @@
 import streamlit as st
 
-st.title("About the Project")
-
+# This page documents the purpose and development method of the application.
+st.title("About this project")
 st.write(
-    "This application was developed as part of the IND320 "
-    "Data to Decision project at NMBU."
+    "This application is the online part of the IND320 Data to Decision project "
+    "at NMBU. The notebook documents API retrieval, Spark/Cassandra processing "
+    "and MongoDB publication."
 )
 
-st.header("Data")
-
+st.subheader("AI usage")
 st.write(
-    "The application uses reservoir data stored in the local "
-    "reservoirs.csv file."
-)
-
-st.header("Technology")
-
-st.write(
-    "The application is developed using Python, Pandas, "
-    "Matplotlib and Streamlit."
+    "AI tools were used for troubleshooting, explaining APIs and improving code "
+    "structure. All suggestions were reviewed, adapted and tested by the student."
 )
