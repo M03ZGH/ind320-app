@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+import time
 from typing import Any
 
 import pandas as pd
@@ -84,38 +86,102 @@ def clean_flow_data(frame: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _fetch_entsoe_direction(
+    client: Any,
+    task: tuple[str, str, str, str, str, str, pd.Timestamp, pd.Timestamp],
+) -> pd.DataFrame | None:
+    """Fetch one ENTSO-E direction with bounded retries."""
+    (
+        _no_zone,
+        _neighbour_zone,
+        connection,
+        source,
+        target,
+        direction,
+        start,
+        end,
+    ) = task
+    for attempt in range(3):
+        try:
+            series = client.query_crossborder_flows(
+                country_code_from=source,
+                country_code_to=target,
+                start=start,
+                end=end,
+            )
+            if series is None or series.empty:
+                return None
+
+            part = series.rename("flow_mw").rename_axis("timestamp").reset_index()
+            part["connection"] = connection
+            part["direction"] = direction
+            part["source_zone"] = source
+            part["target_zone"] = target
+            return part
+        except Exception as exc:
+            if attempt == 2:
+                raise RuntimeError(
+                    f"ENTSO-E request failed after 3 attempts for "
+                    f"{source}->{target} ({start} to {end})"
+                ) from exc
+            delay = 2**attempt
+            print(f"Retrying {source}->{target} in {delay} seconds...")
+            time.sleep(delay)
+    return None
+
+
 def fetch_entsoe_flows(
     client: Any,
     connections: list[tuple[str, str, str]],
     start: pd.Timestamp,
     end: pd.Timestamp,
+    max_workers: int = 4,
 ) -> pd.DataFrame:
-    """Fetch both directions for each connection, using at most one-year windows."""
-    frames: list[pd.DataFrame] = []
+    """Fetch both directions with bounded concurrency and one-year windows."""
+    tasks: list[
+        tuple[str, str, str, str, str, str, pd.Timestamp, pd.Timestamp]
+    ] = []
     window_start = start
-    # ENTSO-E requests are split into one-year windows to stay within API limits.
     while window_start < end:
         window_end = min(window_start + pd.DateOffset(years=1), end)
         for no_zone, neighbour_zone, connection in connections:
-            for source, target, direction in (
-                (no_zone, neighbour_zone, "export_from_NO"),
-                (neighbour_zone, no_zone, "import_to_NO"),
-            ):
-                series = client.query_crossborder_flows(
-                    country_code_from=source,
-                    country_code_to=target,
-                    start=window_start,
-                    end=window_end,
-                )
-                if series is None or series.empty:
-                    continue
-                part = series.rename("flow_mw").rename_axis("timestamp").reset_index()
-                part["connection"] = connection
-                part["direction"] = direction
-                part["source_zone"] = source
-                part["target_zone"] = target
-                frames.append(part)
+            tasks.extend(
+                [
+                    (
+                        no_zone,
+                        neighbour_zone,
+                        connection,
+                        no_zone,
+                        neighbour_zone,
+                        "export_from_NO",
+                        window_start,
+                        window_end,
+                    ),
+                    (
+                        no_zone,
+                        neighbour_zone,
+                        connection,
+                        neighbour_zone,
+                        no_zone,
+                        "import_to_NO",
+                        window_start,
+                        window_end,
+                    ),
+                ]
+            )
         window_start = window_end
+
+    frames: list[pd.DataFrame] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(_fetch_entsoe_direction, client, task)
+            for task in tasks
+        ]
+        for number, future in enumerate(as_completed(futures), start=1):
+            result = future.result()
+            if result is not None:
+                frames.append(result)
+            print(f"Completed ENTSO-E request {number}/{len(tasks)}")
 
     if not frames:
         raise ValueError("ENTSO-E returned no cross-border observations.")

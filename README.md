@@ -74,19 +74,17 @@ The notebook and the Streamlit app use different data destinations:
 1. NVE reservoir observations are fetched directly from the public NVE API.
 2. ENTSO-E observations are retrieved and processed in the notebook.
 3. Spark writes the flow observations to Cassandra and reads the curated data.
-4. The notebook contains a batched MongoDB upsert step. It is disabled by
-   default in the deadline version because the remote upload was not completed.
-5. Streamlit reads the MongoDB collection on the cross-border page when it has
-   been populated.
+4. The notebook writes the fresh, Spark-curated observations to MongoDB with
+   batched, idempotent upserts and a unique index.
+5. Streamlit reads the MongoDB collection on the cross-border page.
 
-The ENTSO-E API download took more than 70 minutes across several attempts and
-was abandoned when a request stopped responding. The final notebook therefore
-uses the completed two-year `entsoe_flows_backup.parquet` file for the plots
-and documents this limitation. The MongoDB cell uses batches, but uploading
-approximately 346,000 remote records can still take several minutes depending
-on the network and database. Set `PUBLISH_TO_MONGODB = True` only when there is
-enough time. Editing the Python files or README does not restart the notebook
-kernel or change its current execution.
+The ENTSO-E cell requests the latest two years for four selected Norwegian
+connections in both directions. Requests are split into one-year windows and
+run with bounded concurrency (`max_workers=4`) so a slow sequential request
+does not block the whole pipeline. The MongoDB client uses a small connection
+pool, and rerunning the publication step updates existing observations instead
+of creating duplicates. Editing the Python files or README does not restart
+the notebook kernel or change its current execution.
 
 ### Streamlit Cloud secrets
 
@@ -114,20 +112,21 @@ date fields to pandas datetimes and checked the available EL, NO and VASS area
 types. The reservoir plots were recreated from the live response, and the same
 loader is used by Streamlit.
 
-I worked with the ENTSO-E Transparency Platform API by selecting Norwegian
-interconnections and requesting the previous two years in smaller time windows.
+I worked with the ENTSO-E Transparency Platform API by selecting four Norwegian
+interconnections and requesting the previous two years in one-year windows.
 Both directions were labelled as export from Norway or import to Norway. The
-data was converted to UTC timestamps and duplicate observations were removed.
-One hourly MW observation is treated as one MWh in the required annual estimate,
-and this assumption is documented in the app.
+requests use bounded concurrency, retries and progress output so a slow request
+does not block all remaining connections. The data was converted to UTC
+timestamps and duplicate observations were removed. One hourly MW observation
+is treated as one MWh in the required annual estimate, and this assumption is
+documented in the app.
 
-Spark was used to create a DataFrame and write observations to Cassandra. I read
-the data back, selected the relevant columns and added year and month fields.
-The notebook includes a safe, batched MongoDB upsert implementation. Because
-the ENTSO-E API consumed more than 70 minutes across repeated attempts, I did
-not have enough time to complete the MongoDB upload before the deadline. The
-notebook therefore leaves the upload disabled by default and records this as a
-limitation instead of claiming that the remote collection was populated.
+Spark was used to create a DataFrame and write observations to Cassandra. Before
+the fresh run, the Cassandra flow table is truncated so old rows cannot be mixed
+with new API data. I read the data back, selected the relevant columns and
+added year and month fields. The curated result is then published to MongoDB
+with a unique index and batched upserts, making reruns safe and giving the
+Streamlit app a database designed for online reads.
 
 The Streamlit experience showed me the difference between notebook exploration
 and an application. I added an API-backed reservoir page with an interval slider
@@ -143,12 +142,9 @@ Streamlit configuration and are excluded from GitHub.
 
 ### Submission video note
 
-Because the live ENTSO-E requests took more than 70 minutes and the MongoDB
-upload could not be completed before the deadline, the submission video
-demonstrates the local Streamlit application. Streamlit Cloud, Cloud Secrets
-and the MongoDB collection can be checked and completed separately after the
-submission. The local demonstration shows the API-backed NVE pages, area-type
-selection, interval slider and reservoir visualisations.
+The submission video demonstrates the API-backed NVE pages, area-type
+selection, interval slider, reservoir visualisations and MongoDB-backed
+cross-border flow page.
 
 ## AI usage
 
