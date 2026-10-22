@@ -12,7 +12,15 @@ def get_collection():
     # Streamlit Cloud supplies the same structure through its Secrets setting.
     if "mongo" not in st.secrets or not st.secrets["mongo"].get("uri"):
         raise RuntimeError("Add [mongo].uri to Streamlit secrets.")
-    client = MongoClient(st.secrets["mongo"]["uri"], serverSelectionTimeoutMS=10000)
+    client = MongoClient(
+        st.secrets["mongo"]["uri"],
+        serverSelectionTimeoutMS=10000,
+        connectTimeoutMS=10000,
+        maxPoolSize=5,
+        minPoolSize=0,
+        maxIdleTimeMS=60000,
+        waitQueueTimeoutMS=30000,
+    )
     client.admin.command("ping")
     return client["ind320"]["crossborder_flows"]
 
