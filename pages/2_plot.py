@@ -3,11 +3,17 @@ import pandas as pd
 import streamlit as st
 
 from ind320_app.data import load_reservoir_data
+from ind320_app.ui import render_sidebar
+
+render_sidebar()
 
 # Capacity is not offered here because it is mostly constant and is not useful
 # as a time-series measure.
-st.title("Reservoir development")
-st.write("Choose an area type and a download interval to compare reservoir measures.")
+st.title("Reservoir Development")
+st.write(
+    "Choose an NVE area type and recent time interval to compare reservoir "
+    "measures from the live NVE API."
+)
 
 interval = st.slider("Download interval (weeks)", 4, 520, 104, 4)
 area_type = st.radio("Area type", ["EL", "NO", "VASS"], horizontal=True)

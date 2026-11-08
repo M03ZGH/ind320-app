@@ -2,8 +2,15 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 from pymongo import MongoClient
+from ind320_app.ui import render_sidebar
 
-st.title("Cross-border electricity flows")
+render_sidebar()
+
+st.title("Cross-Border Electricity Flows")
+st.caption(
+    "Data source: ENTSO-E Transparency Platform API. Curated observations are "
+    "read from MongoDB."
+)
 
 
 @st.cache_resource

@@ -1,7 +1,9 @@
 .venv/
 __pycache__/
+.ipynb_checkpoints/
 .DS_Store
 .streamlit/secrets.toml
+data/weather_cache/
 *.env
 # Don't sync folder No_sync
 No_sync

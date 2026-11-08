@@ -1,24 +1,26 @@
 import streamlit as st
 
+from ind320_app.ui import render_sidebar
+
 # Configure the shared layout before rendering any page content.
 st.set_page_config(
     page_title="IND320 Data to Decision",
     page_icon="💧",
     layout="wide",
 )
+render_sidebar()
 
-st.title("IND320 – Data to Decision")
+st.title("Data to Decision")
 st.markdown(
-    "Interactive analysis of Norwegian reservoir statistics and cross-border "
-    "electricity flows."
+    "An interactive portfolio for Norwegian reservoir statistics, ERA5 weather "
+    "analysis and cross-border electricity flows."
 )
 
 st.subheader("Project overview")
-# The sidebar pages contain the API-backed reservoir view and MongoDB flow view.
 st.write(
-    "Use the pages in the sidebar to fetch current reservoir data from NVE, "
-    "inspect the required NVE area types (EL, NO and VASS), and explore ENTSO-E flow data "
-    "prepared in the Jupyter Notebook and stored in MongoDB."
+    "Use the pages in the sidebar to explore live NVE reservoir observations, "
+    "prepared ERA5 weather observations, outliers, time-series structure and "
+    "ENTSO-E cross-border electricity flows."
 )
 
 st.caption(
@@ -29,7 +31,8 @@ st.caption(
 with st.expander("Data sources"):
     st.markdown(
         "- [NVE Magasinstatistikk API](https://biapi.nve.no/magasinstatistikk/swagger/index.html)\n"
+        "- [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5)\n"
         "- [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/)\n"
-        "- Cassandra and Spark are used in the notebook pipeline.\n"
-        "- MongoDB Atlas supplies the online flow view."
+        "- MongoDB Atlas supplies prepared weather and flow observations.\n"
+        "- Spark and Cassandra are used in the Part 2 notebook pipeline."
     )
