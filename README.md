@@ -35,7 +35,7 @@ the Norway–Denmark connection is queried as `NO_2 -> DK_1`, not as a generic
 `NO -> DK` connection.
 
 **Live application:**
-https://ind320-app-wktckrzn7uk2axexipgwwq.streamlit.app
+https://ind320-data-to-decision-moez.streamlit.app
 
 **Public GitHub repository:**
 https://github.com/M03ZGH/ind320-app
