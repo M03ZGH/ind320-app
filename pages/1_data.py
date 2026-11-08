@@ -3,10 +3,15 @@ import plotly.express as px
 import streamlit as st
 
 from ind320_app.data import load_reservoir_data
+from ind320_app.ui import render_sidebar
+
+render_sidebar()
 
 # This page deliberately fetches NVE data instead of reading the old Part 1 CSV.
-st.title("NVE reservoir data")
-st.caption("The data is fetched directly from the NVE Magasinstatistikk API.")
+st.title("NVE Reservoir Data")
+st.caption(
+    "Data source: NVE Magasinstatistikk API. The old Part 1 CSV is not used."
+)
 
 interval = st.slider(
     "Download interval (number of recent weeks)",
