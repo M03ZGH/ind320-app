@@ -8,9 +8,12 @@ The project explores Norwegian reservoir data and cross-border electricity flows
 
 * `IND320_part1.ipynb` – Jupyter Notebook for Part 1.
 * `IND320_part2.ipynb` – Jupyter Notebook documenting the Part 2 API, Spark, Cassandra and MongoDB pipeline.
+* `IND320_part3.ipynb` – Jupyter Notebook for ERA5 weather, outliers, STL, spectrogram and MongoDB publication.
 * `main.py` – Main page of the Streamlit application.
 * `pages/` – Additional pages for data exploration and visualization.
 * `src/ind320_app/data.py` – Shared API and data-preparation functions.
+* `src/ind320_app/part3.py` – Shared Part 3 weather and time-series functions.
+* `src/ind320_app/ui.py` – Shared Streamlit sidebar and project navigation styling.
 * `pyproject.toml` – Project dependencies and configuration.
 * `uv.lock` – Locked dependency versions.
 
@@ -22,6 +25,9 @@ The interactive application provides:
 * Radio buttons for EL, NO and VASS area types.
 * An interval slider controlling the downloaded reservoir period.
 * MongoDB-backed cross-border flow plots with a yearly pie chart and multi-month line chart.
+* STL and spectrogram tabs for reservoir filling.
+* DCT/SPC precipitation outlier and LOF temperature anomaly tabs.
+* A consistent sidebar with navigation, data-pipeline explanations and project links.
 
 `EL`, `NO` and `VASS` are NVE reservoir area types. They are unrelated to ENTSO-E
 bidding zones. ENTSO-E connections use codes such as `NO_2` and `DK_1`; therefore
@@ -57,17 +63,37 @@ uri = "your-mongodb-connection-string"
 ```
 
 The notebook also requires local Cassandra and Spark for the database part of the pipeline.
+Part 3 additionally requires the complete `NVE_Region` shapefile set (`.shp`, `.shx`,
+`.dbf` and `.prj`) from [Atlas](https://atlas.nve.no/), placed in `data/`.
+
+The shapefile is a local input and must not be committed without all companion
+files. The weather cache in `data/weather_cache/` is also local and ignored by
+Git. The notebook samples 1000 points per NVE region, sends them to Open-Meteo
+in small batches, averages the hourly ERA5 observations and publishes the
+resulting NO3 series to MongoDB.
 
 ## Running locally
 
-From the `ind320-app` folder:
+Open a terminal and run these commands from the `ind320-app` folder:
 
 ```bash
+cd /Users/moezyadgar/GitHub/IND320/ind320-app
+uv sync
 .venv/bin/python -m streamlit run main.py
 ```
 
-The app opens at `http://localhost:8501`. If the virtual environment is
-activated first, the equivalent command is `streamlit run main.py`.
+The app opens at [http://localhost:8501](http://localhost:8501). Keep the
+terminal open while using the app and press `Ctrl+C` to stop it. If the
+environment is activated first, use:
+
+```bash
+source .venv/bin/activate
+streamlit run main.py
+```
+
+The NVE and reservoir pages work without local database secrets. The
+cross-border page additionally needs `.streamlit/secrets.toml`, and the
+Part 3 weather page needs `data/NVE_Region.shp`, `.shx`, `.dbf` and `.prj`.
 
 The notebook and the Streamlit app use different data destinations:
 
@@ -76,7 +102,9 @@ The notebook and the Streamlit app use different data destinations:
 3. Spark writes the flow observations to Cassandra and reads the curated data.
 4. The notebook writes the fresh, Spark-curated observations to MongoDB with
    batched, idempotent upserts and a unique index.
-5. Streamlit reads the MongoDB collection on the cross-border page.
+5. The Part 3 notebook writes aggregated ERA5 weather observations to the
+   `ind320.weather` collection with the same idempotent approach.
+6. Streamlit reads MongoDB on the cross-border and weather pages.
 
 The ENTSO-E cell requests the latest two years for four selected Norwegian
 connections in both directions. Requests are split into one-year windows and
@@ -103,6 +131,28 @@ The `Cross-border electricity flows` page verifies the MongoDB connection with
 `ping`, reads the curated `ind320.crossborder_flows` collection, and displays an
 error instead of silently showing an empty chart if the connection or collection
 is unavailable.
+
+After the Part 3 weather download, run the notebook's MongoDB publication cell.
+It writes the `NO3` hourly averages to `ind320.weather`. The public weather page
+then reads this collection instead of calling Open-Meteo for every visitor.
+
+## Part 3 notebook run order
+
+Run `IND320_part3.ipynb` from the `ind320-app` folder in this order:
+
+1. Load the project imports and locate `data/NVE_Region.shp`.
+2. Sample 1000 points per NVE region.
+3. Download the 2024 NO3 ERA5 data. Requests are batched and cached in
+   `data/weather_cache/`; progress is printed for every batch.
+4. Run the MongoDB publication cell. It requires `[mongo].uri` in local
+   `.streamlit/secrets.toml` and writes `ind320.weather`.
+5. Run the SPC, LOF, STL and spectrogram cells.
+6. Save the executed notebook and export it to PDF with outputs and figures
+   visible.
+
+The public Streamlit weather page reads MongoDB, so it does not need the local
+shapefile or a live Open-Meteo download. Configure the same `[mongo].uri` under
+**Settings → Secrets** in Streamlit Cloud.
 
 ## Part 2 log and AI usage
 
@@ -139,6 +189,44 @@ AI tools were used to understand error messages, check API usage, discuss the
 data pipeline and improve Python and Streamlit structure. I reviewed and adapted
 all suggestions and tested the resulting code. Secrets remain in local
 Streamlit configuration and are excluded from GitHub.
+
+## Part 3 log and AI usage
+
+In Part 3 I extended the Part 2 project with spatial weather data and time-series
+analysis. I downloaded the NVE region shapefile from Atlas and used GeoPandas to
+sample 1000 reproducible locations inside every polygon. The sampled points were
+transformed to WGS84 longitude and latitude before being sent to Open-Meteo. The
+download function accepts a region identifier and a time interval, requests
+hourly ERA5 reanalysis data for precipitation, temperature and wind speed, and
+averages the values across the sampled locations. The requests are split into
+small batches because the public API limits very large requests. Completed
+batches are cached locally, and progress messages make a long download
+observable and restartable.
+
+The resulting NO3 series for 2024 was published to the existing MongoDB account
+in the `ind320.weather` collection. Upserts and a unique index on region and
+timestamp make the publication safe to repeat. The Streamlit weather page reads
+this prepared collection rather than downloading weather data every time a
+visitor opens the public app. This makes the online application faster and
+avoids exposing API-download controls to users.
+
+For precipitation, I used a Discrete Cosine Transform high-pass filter to remove
+low-frequency seasonal variation. Robust median and median absolute deviation
+estimates from the full year define the SPC boundaries. The plot displays the
+original average precipitation and highlights observations outside the limits;
+the seasonally adjusted values are used only for classification. For
+temperature, Local Outlier Factor identifies anomalies using a default
+contamination proportion of 1%.
+
+I also applied STL decomposition to the NVE degree-of-filling series and created
+a spectrogram of the same weekly series. The seasonal smoother, trend smoother,
+robust fitting, window length and overlap are explicit parameters. The Streamlit
+application presents these analyses in two tabbed pages: STL/spectrogram and
+precipitation SPC/temperature LOF. AI tools were used to understand GeoPandas,
+Open-Meteo, DCT, robust statistics, LOF, STL, MongoDB and Streamlit. I reviewed
+and adapted the suggestions, tested the functions with synthetic data, checked
+the notebook and Python syntax, and kept all credentials in local or Streamlit
+Cloud secrets.
 
 ### Submission video note
 
