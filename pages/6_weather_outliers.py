@@ -59,6 +59,10 @@ with spc_tab:
     plt.close(figure)
     st.metric("SPC outliers", int(summary["outlier"].sum()))
     st.dataframe(summary[summary["outlier"]], use_container_width=True)
+    st.caption(
+        "The DCT removes slow seasonal variation before robust median/MAD limits "
+        "classify unusual hourly precipitation."
+    )
 
 with lof_tab:
     contamination = st.slider("LOF outlier proportion", 0.001, 0.2, 0.01, 0.001)
@@ -67,10 +71,15 @@ with lof_tab:
     plt.close(figure)
     st.metric("LOF anomalies", int(summary["anomaly"].sum()))
     st.dataframe(summary[summary["anomaly"]], use_container_width=True)
+    st.caption(
+        "LOF compares each temperature observation with its local neighbours; "
+        "the 1% setting highlights the most isolated observations."
+    )
 
-with st.expander("Data source"):
+with st.expander("Data source and method"):
     st.write(
-        "The notebook sampled 1000 locations inside the NVE region and downloaded "
-        "hourly ERA5 reanalysis data from Open-Meteo. The spatial averages are "
-        "stored in MongoDB and read by this public Streamlit page."
+        "NO3 is the precipitation region corresponding to the sampled NVE "
+        "electricity-region polygon(s). The notebook downloads and averages the "
+        "1000 sampled locations, then publishes the 2024 hourly averages to "
+        "MongoDB for this public page."
     )

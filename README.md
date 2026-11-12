@@ -8,7 +8,7 @@ The project explores Norwegian reservoir data and cross-border electricity flows
 
 * `IND320_part1.ipynb` – Jupyter Notebook for Part 1.
 * `IND320_part2.ipynb` – Jupyter Notebook documenting the Part 2 API, Spark, Cassandra and MongoDB pipeline.
-* `IND320_part3.ipynb` – Jupyter Notebook for ERA5 weather, outliers, STL, spectrogram and MongoDB publication.
+* `IND320_part3.ipynb` – Jupyter Notebook for ERA5 weather, outliers, STL and spectrogram.
 * `main.py` – Main page of the Streamlit application.
 * `pages/` – Additional pages for data exploration and visualization.
 * `src/ind320_app/data.py` – Shared API and data-preparation functions.
@@ -26,7 +26,7 @@ The interactive application provides:
 * An interval slider controlling the downloaded reservoir period.
 * MongoDB-backed cross-border flow plots with a yearly pie chart and multi-month line chart.
 * STL and spectrogram tabs for reservoir filling.
-* DCT/SPC precipitation outlier and LOF temperature anomaly tabs.
+* DCT/SPC precipitation outlier and LOF temperature anomaly tabs using MongoDB-published Open-Meteo data.
 * A consistent sidebar with navigation, data-pipeline explanations and project links.
 
 `EL`, `NO` and `VASS` are NVE reservoir area types. They are unrelated to ENTSO-E
@@ -102,8 +102,7 @@ The notebook and the Streamlit app use different data destinations:
 3. Spark writes the flow observations to Cassandra and reads the curated data.
 4. The notebook writes the fresh, Spark-curated observations to MongoDB with
    batched, idempotent upserts and a unique index.
-5. The Part 3 notebook writes aggregated ERA5 weather observations to the
-   `ind320.weather` collection with the same idempotent approach.
+5. The notebook publishes aggregated Part 3 weather observations to MongoDB.
 6. Streamlit reads MongoDB on the cross-border and weather pages.
 
 The ENTSO-E cell requests the latest two years for four selected Norwegian
@@ -132,10 +131,6 @@ The `Cross-border electricity flows` page verifies the MongoDB connection with
 error instead of silently showing an empty chart if the connection or collection
 is unavailable.
 
-After the Part 3 weather download, run the notebook's MongoDB publication cell.
-It writes the `NO3` hourly averages to `ind320.weather`. The public weather page
-then reads this collection instead of calling Open-Meteo for every visitor.
-
 ## Part 3 notebook run order
 
 Run `IND320_part3.ipynb` from the `ind320-app` folder in this order:
@@ -143,16 +138,15 @@ Run `IND320_part3.ipynb` from the `ind320-app` folder in this order:
 1. Load the project imports and locate `data/NVE_Region.shp`.
 2. Sample 1000 points per NVE region.
 3. Download the 2024 NO3 ERA5 data. Requests are batched and cached in
-   `data/weather_cache/`; progress is printed for every batch.
+   `data/weather_cache/`; progress is printed every tenth batch.
 4. Run the MongoDB publication cell. It requires `[mongo].uri` in local
    `.streamlit/secrets.toml` and writes `ind320.weather`.
 5. Run the SPC, LOF, STL and spectrogram cells.
 6. Save the executed notebook and export it to PDF with outputs and figures
    visible.
 
-The public Streamlit weather page reads MongoDB, so it does not need the local
-shapefile or a live Open-Meteo download. Configure the same `[mongo].uri` under
-**Settings → Secrets** in Streamlit Cloud.
+The public Streamlit weather page reads the prepared `ind320.weather` collection
+instead of downloading weather data for every visitor.
 
 ## Part 2 log and AI usage
 
@@ -203,12 +197,11 @@ small batches because the public API limits very large requests. Completed
 batches are cached locally, and progress messages make a long download
 observable and restartable.
 
-The resulting NO3 series for 2024 was published to the existing MongoDB account
+The resulting NO3 series for 2024 is published to the existing MongoDB account
 in the `ind320.weather` collection. Upserts and a unique index on region and
 timestamp make the publication safe to repeat. The Streamlit weather page reads
 this prepared collection rather than downloading weather data every time a
-visitor opens the public app. This makes the online application faster and
-avoids exposing API-download controls to users.
+visitor opens the public app.
 
 For precipitation, I used a Discrete Cosine Transform high-pass filter to remove
 low-frequency seasonal variation. Robust median and median absolute deviation

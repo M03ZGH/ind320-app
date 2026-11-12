@@ -33,6 +33,6 @@ with st.expander("Data sources"):
         "- [NVE Magasinstatistikk API](https://biapi.nve.no/magasinstatistikk/swagger/index.html)\n"
         "- [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5)\n"
         "- [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/)\n"
-        "- MongoDB Atlas supplies prepared weather and flow observations.\n"
+        "- MongoDB Atlas supplies prepared weather and cross-border flow observations.\n"
         "- Spark and Cassandra are used in the Part 2 notebook pipeline."
     )

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 import requests
@@ -195,7 +196,9 @@ def download_weather(
                     )
                 retry_after = response.headers.get("Retry-After")
                 delay = float(retry_after) if retry_after else min(120.0, 10 * 2**attempt)
-                if show_progress:
+                if show_progress and (
+                    batch_number % 10 == 0 or batch_number == total_batches
+                ):
                     print(
                         f"Weather download: batch {batch_number}/{total_batches} "
                         f"rate-limited (429); retry {attempt + 1}/{max_retries} "
@@ -264,8 +267,11 @@ def plot_spc_precipitation(
     axis.scatter(values.index[outlier], values[outlier], color="crimson", label="SPC outlier")
     axis.axhline(values.mean(), color="black", alpha=0.25, label="Mean")
     axis.fill_between(values.index, lower + seasonal, upper + seasonal, alpha=0.15, label="SPC limits")
-    axis.set(title="Average precipitation with robust SPC limits", ylabel="Precipitation")
-    axis.legend()
+    axis.set(
+        title="Average precipitation with robust SPC limits",
+        ylabel="Precipitation (mm/h)",
+    )
+    axis.legend(loc="upper right", framealpha=0.8)
     figure.tight_layout()
     return figure, summary
 
@@ -323,15 +329,24 @@ def plot_spectrogram(
     if not 0 <= overlap < 1:
         raise ValueError("overlap must be in the interval [0, 1).")
     frequencies, times, power = spectrogram(
-        series.to_numpy(), nperseg=window_length, noverlap=int(window_length * overlap)
+        series.to_numpy(),
+        nperseg=window_length,
+        noverlap=int(window_length * overlap),
+        detrend="linear",
     )
+    power_db = 10 * np.log10(np.maximum(power, np.finfo(float).tiny))
+    start = series.index[0]
+    dates = start + pd.to_timedelta(times, unit="W")
     figure, axis = plt.subplots(figsize=(11, 4))
-    mesh = axis.pcolormesh(times, frequencies, power, shading="auto")
-    figure.colorbar(mesh, ax=axis, label="Power")
+    mesh = axis.pcolormesh(dates, frequencies, power_db, shading="auto")
+    figure.colorbar(mesh, ax=axis, label="Power (dB)")
+    axis.set_ylim(0, min(0.25, frequencies[-1]))
     axis.set(
         title="Spectrogram of reservoir filling degree",
-        xlabel="Time (weeks)",
+        xlabel="Date",
         ylabel="Frequency (cycles/week)",
     )
+    axis.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    figure.autofmt_xdate()
     figure.tight_layout()
     return figure
