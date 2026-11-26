@@ -2,7 +2,7 @@ import streamlit as st
 
 from ind320_app.ui import render_sidebar
 
-# Configure the shared layout before rendering any page content.
+# Set the shared presentation before the navigation tree is created.
 st.set_page_config(
     page_title="IND320 Data to Decision",
     page_icon="💧",
@@ -10,29 +10,40 @@ st.set_page_config(
 )
 render_sidebar()
 
-st.title("Data to Decision")
-st.markdown(
-    "An interactive portfolio for Norwegian reservoir statistics, ERA5 weather "
-    "analysis and cross-border electricity flows."
-)
-
-st.subheader("Project overview")
-st.write(
-    "Use the pages in the sidebar to explore live NVE reservoir observations, "
-    "prepared ERA5 weather observations, outliers, time-series structure and "
-    "ENTSO-E cross-border electricity flows."
-)
-
-st.caption(
-    "NVE area types and ENTSO-E bidding zones are separate classifications. "
-    "For example, the Norway–Denmark interconnector is queried as NO_2 ↔ DK_1."
-)
-
-with st.expander("Data sources"):
-    st.markdown(
-        "- [NVE Magasinstatistikk API](https://biapi.nve.no/magasinstatistikk/swagger/index.html)\n"
-        "- [Open-Meteo Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api) (ERA5)\n"
-        "- [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/)\n"
-        "- MongoDB Atlas supplies prepared weather and cross-border flow observations.\n"
-        "- Spark and Cassandra are used in the Part 2 notebook pipeline."
-    )
+pages = {
+    "Project": [
+        st.Page("pages/0_overview.py", title="Overview", icon="💧", default=True),
+    ],
+    "Explore": [
+        st.Page("pages/1_data.py", title="NVE Data", icon="🗃️"),
+        st.Page("pages/2_plot.py", title="Reservoir Development", icon="📈"),
+        st.Page("pages/3_map.py", title="Map", icon="🗺️"),
+        st.Page(
+            "pages/4_correlation.py",
+            title="Weather Correlation",
+            icon="🌦️",
+        ),
+        st.Page(
+            "pages/5_outliers.py",
+            title="Weather Outliers",
+            icon="🔎",
+        ),
+        st.Page(
+            "pages/6_time_series.py",
+            title="Time-Series Analysis",
+            icon="〰️",
+        ),
+    ],
+    "Predict": [
+        st.Page("pages/7_forecast.py", title="Filling Forecast", icon="🔮"),
+    ],
+    "Data sources": [
+        st.Page("pages/8_currency.py", title="Currency Rates", icon="💱"),
+        st.Page(
+            "pages/9_crossborder.py",
+            title="Cross-Border Flows",
+            icon="⚡",
+        ),
+    ],
+}
+st.navigation(pages).run()
