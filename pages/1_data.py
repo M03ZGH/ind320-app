@@ -21,10 +21,14 @@ interval = st.slider(
     step=4,
 )
 
+@st.cache_data(ttl=3600, show_spinner="Loading NVE reservoir observations...")
+def load_cached_reservoir_data() -> pd.DataFrame:
+    return load_reservoir_data()
+
 # Network errors are shown in the app so a failed API request is not mistaken
 # for an empty dataset.
 try:
-    data = load_reservoir_data()
+    data = load_cached_reservoir_data()
 except Exception as exc:
     st.error(f"Could not retrieve data from NVE: {exc}")
     st.stop()
@@ -63,6 +67,7 @@ st.plotly_chart(
             measure: measure.replace("_", " ").title(),
             "area_number": "Area number",
         },
+        template="plotly_white",
     ),
     use_container_width=True,
 )
