@@ -7,3 +7,4 @@ data/weather_cache/
 *.env
 # Don't sync folder No_sync
 No_sync
+data/weather_cache_el*/
