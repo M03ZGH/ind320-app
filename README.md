@@ -9,10 +9,12 @@ The project explores Norwegian reservoir data and cross-border electricity flows
 * `IND320_part1.ipynb` – Jupyter Notebook for Part 1.
 * `IND320_part2.ipynb` – Jupyter Notebook documenting the Part 2 API, Spark, Cassandra and MongoDB pipeline.
 * `IND320_part3.ipynb` – Jupyter Notebook for ERA5 weather, outliers, STL and spectrogram.
+* `IND320_part4.ipynb` – Currency API, timezone, River forecasting and Streamlit design work.
 * `main.py` – Main page of the Streamlit application.
 * `pages/` – Additional pages for data exploration and visualization.
 * `src/ind320_app/data.py` – Shared API and data-preparation functions.
 * `src/ind320_app/part3.py` – Shared Part 3 weather and time-series functions.
+* `src/ind320_app/part4.py` – Currency, sliding-correlation, River forecast and Plotly helpers.
 * `src/ind320_app/ui.py` – Shared Streamlit sidebar and project navigation styling.
 * `pyproject.toml` – Project dependencies and configuration.
 * `uv.lock` – Locked dependency versions.
@@ -26,7 +28,13 @@ The interactive application provides:
 * An interval slider controlling the downloaded reservoir period.
 * MongoDB-backed cross-border flow plots with a yearly pie chart and multi-month line chart.
 * STL and spectrogram tabs for reservoir filling.
-* DCT/SPC precipitation outlier and LOF temperature anomaly tabs using MongoDB-published Open-Meteo data.
+* Weather-property selection for seasonally adjusted SPC and LOF anomaly analyses.
+* A grouped navigation (Explore, Predict, Data sources) with the page order sketched in the Part 4 notebook.
+* A GeoJSON map of the NVE price areas (NO1–NO5), Norway as a whole and the weather regions, coloured by a weather property or by reservoir filling for a chosen week. Clicking an area outlines it and stores the selection for other pages.
+* Sliding-window weather/filling correlation with selectable lag and window length.
+* A monthly River reservoir forecast with selectable history, horizon, lag count, learning rate and exogenous data.
+* EUR/NOK and USD/NOK rates downloaded from Norges Bank.
+* Plotly charts styled to match the application theme.
 * A consistent sidebar with navigation, data-pipeline explanations and project links.
 
 `EL`, `NO` and `VASS` are NVE reservoir area types. They are unrelated to ENTSO-E
@@ -44,7 +52,8 @@ https://github.com/M03ZGH/ind320-app
 
 * Python
 * Pandas
-* Matplotlib
+* Plotly
+* River
 * Streamlit
 * Jupyter Notebook
 * uv
@@ -63,12 +72,17 @@ uri = "your-mongodb-connection-string"
 ```
 
 The notebook also requires local Cassandra and Spark for the database part of the pipeline.
-Part 3 additionally requires the complete `NVE_Region` shapefile set (`.shp`, `.shx`,
-`.dbf` and `.prj`) from [Atlas](https://atlas.nve.no/), placed in `data/`.
+Part 3 and 4 additionally require the complete `Budområder` (electricity price areas
+NO1–NO5) and `NVE_Region` (precipitation regions) shapefile sets (`.shp`, `.shx`,
+`.dbf` and `.prj`) from [Atlas](https://atlas.nve.no/), placed in `data/`. NO3 weather
+must be sampled from the `Budområder` polygon, not from the precipitation region RM
+(RM covers only about half of NO3).
 
 The shapefile is a local input and must not be committed without all companion
-files. The weather cache in `data/weather_cache/` is also local and ignored by
-Git. The notebook samples 1000 points per NVE region, sends them to Open-Meteo
+files. It is needed when rerunning Part 3's coordinate sampling; the Part 4
+map uses the committed GeoJSON conversions (`nve_el_areas.geojson`, `nve_weather_regions.geojson`). The weather cache in
+`data/weather_cache/` is also local and ignored by Git. The notebook samples
+1000 points per NVE region, sends them to Open-Meteo
 in small batches, averages the hourly ERA5 observations and publishes the
 resulting NO3 series to MongoDB.
 
@@ -91,9 +105,21 @@ source .venv/bin/activate
 streamlit run main.py
 ```
 
-The NVE and reservoir pages work without local database secrets. The
-cross-border page additionally needs `.streamlit/secrets.toml`, and the
-Part 3 weather page needs `data/NVE_Region.shp`, `.shx`, `.dbf` and `.prj`.
+The NVE and currency pages work without local database secrets. The cross-border,
+weather map, weather analysis, correlation and exogenous-data forecast pages
+additionally need `[mongo].uri` in `.streamlit/secrets.toml`. The map currently
+draws the converted price-area (`Budområder.shp`), Norway and weather-region GeoJSON
+files in `data/`. VASS (water-area) polygons are not included, so VASS is not drawn.
+The Part 4 notebook samples 100 random weather points per price area instead of
+the 1000 asked for, because of Open-Meteo API limits (downloads are cached in
+`data/weather_cache_el_100/`, which is git-ignored).
+
+Run `IND320_part4.ipynb` from the `ind320-app` folder. It compares River model
+settings against a persistence baseline using monthly NVE data, demonstrates
+the Norges Bank API helper, records timestamp alignment decisions, and contains
+the navigation sketch and project log. The app defaults to the best measured
+configuration for the tested EL1 series (120 months, 12 lags and learning rate
+0.01); the model settings remain user-selectable.
 
 The notebook and the Streamlit app use different data destinations:
 
