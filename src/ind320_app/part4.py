@@ -18,6 +18,9 @@ from scipy.fft import dct, idct
 from sklearn.neighbors import LocalOutlierFactor
 from statsmodels.tsa.seasonal import STL
 
+# Registers the shared Plotly template named "ind320" (colours, fonts, grid).
+from ind320_app import theme  # noqa: E402,F401
+
 NORGES_BANK_URL = "https://data.norges-bank.no/api/data/EXR"
 WEATHER_PROPERTIES = {
     "temperature_2m": ("Temperature", "°C"),
@@ -357,7 +360,7 @@ def plot_weather_spc(
         title=f"{label} with robust SPC limits",
         xaxis_title="Date",
         yaxis_title=unit,
-        template="plotly_white",
+        template="ind320",
         hovermode="x unified",
     )
     return figure, summary
@@ -396,7 +399,7 @@ def plot_weather_lof(
         title=f"{label} with Local Outlier Factor anomalies",
         xaxis_title="Date",
         yaxis_title=unit,
-        template="plotly_white",
+        template="ind320",
         hovermode="x unified",
     )
     return figure, summary
@@ -431,7 +434,7 @@ def plot_stl_interactive(
     figure.update_layout(
         title="STL decomposition of weekly reservoir filling",
         height=800,
-        template="plotly_white",
+        template="ind320",
     )
     return figure
 
@@ -468,6 +471,6 @@ def plot_spectrogram_interactive(
         title="Spectrogram of reservoir filling",
         xaxis_title="Date",
         yaxis_title="Frequency (cycles/week)",
-        template="plotly_white",
+        template="ind320",
     )
     return figure
