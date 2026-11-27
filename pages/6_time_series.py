@@ -7,9 +7,7 @@ from ind320_app.part4 import (
     plot_spectrogram_interactive,
     plot_stl_interactive,
 )
-from ind320_app.ui import render_sidebar
 
-render_sidebar()
 
 st.title("Time-Series Analysis")
 st.caption(
@@ -41,6 +39,20 @@ series = (
     .dropna()
 )
 
+
+
+@st.cache_data(show_spinner="Computing STL decomposition...")
+def cached_stl(values, seasonal, robust):
+    return plot_stl_interactive(values, seasonal=seasonal, robust=robust)
+
+
+@st.cache_data(show_spinner="Computing spectrogram...")
+def cached_spectrogram(values, window_length, overlap):
+    return plot_spectrogram_interactive(
+        values, window_length=window_length, overlap=overlap
+    )
+
+
 stl_tab, spectrogram_tab = st.tabs(["STL decomposition", "Spectrogram"])
 with stl_tab:
     seasonal = st.number_input(
@@ -55,13 +67,11 @@ with stl_tab:
         st.warning("The seasonal smoother must be odd.")
     else:
         try:
-            figure = plot_stl_interactive(
-                series, seasonal=seasonal, robust=robust
-            )
+            figure = cached_stl(series, seasonal, robust)
         except ValueError as exc:
             st.warning(str(exc))
         else:
-            st.plotly_chart(figure, use_container_width=True)
+            st.plotly_chart(figure, width="stretch")
 
 with spectrogram_tab:
     window = st.number_input(
@@ -69,13 +79,11 @@ with spectrogram_tab:
     )
     overlap = st.slider("Window overlap", 0.0, 0.9, 0.5, 0.05)
     try:
-        figure = plot_spectrogram_interactive(
-            series, window_length=window, overlap=overlap
-        )
+        figure = cached_spectrogram(series, window, overlap)
     except ValueError as exc:
         st.warning(str(exc))
     else:
-        st.plotly_chart(figure, use_container_width=True)
+        st.plotly_chart(figure, width="stretch")
     st.caption(
         "Bright areas show stronger periodic components. Low frequencies represent "
         "slow seasonal variation, while higher frequencies represent shorter-term "

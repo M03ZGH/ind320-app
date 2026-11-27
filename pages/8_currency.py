@@ -4,10 +4,10 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from ind320_app.part4 import download_currency_rates
-from ind320_app.ui import render_sidebar
+from ind320_app import theme  # noqa: F401  (registers the Plotly template)
 
-render_sidebar()
+from ind320_app.part4 import download_currency_rates
+
 st.title("Currency Exchange Rates")
 st.caption(
     "Norges Bank daily spot rates, quoted as Norwegian kroner per euro or US "
@@ -55,11 +55,11 @@ st.plotly_chart(
         color="currency",
         markers=True,
         title="Daily exchange rates",
-        template="plotly_white",
+        template="ind320",
     ),
-    use_container_width=True,
+    width="stretch",
 )
-st.dataframe(rates.tail(20), use_container_width=True)
+st.dataframe(rates.tail(20), width="stretch")
 with st.expander("Source and timing"):
     st.write(
         "Rates are downloaded from Norges Bank's public SDMX API. The daily "

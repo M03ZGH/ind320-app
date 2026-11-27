@@ -3,13 +3,14 @@
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+
+from ind320_app import theme  # noqa: F401  (registers the Plotly template)
 from pymongo import MongoClient
 
 from ind320_app.data import load_reservoir_data
 from ind320_app.part4 import download_currency_rates, forecast_reservoir_filling
-from ind320_app.ui import render_sidebar
+from ind320_app.weather import AREAS, load_area_weather
 
-render_sidebar()
 st.title("Reservoir Filling Forecast")
 st.caption(
     "An online lag-based River regression predicts monthly filling. Selected "
@@ -20,30 +21,6 @@ st.caption(
 @st.cache_data(ttl=3600, show_spinner="Loading NVE reservoir observations...")
 def load_reservoirs() -> pd.DataFrame:
     return load_reservoir_data()
-
-@st.cache_data(ttl=600, show_spinner="Loading weather observations...")
-def load_weather() -> pd.DataFrame:
-    if "mongo" not in st.secrets or not st.secrets["mongo"].get("uri"):
-        raise RuntimeError("Add [mongo].uri to Streamlit secrets.")
-    client = MongoClient(
-        st.secrets["mongo"]["uri"],
-        serverSelectionTimeoutMS=10000,
-        connectTimeoutMS=10000,
-    )
-    try:
-        client.admin.command("ping")
-        records = list(
-            client["ind320"]["weather"].find(
-                {"region": "NO3"}, {"_id": 0}
-            ).sort("timestamp", 1)
-        )
-    finally:
-        client.close()
-    if not records:
-        raise ValueError("No NO3 weather data was found in MongoDB.")
-    frame = pd.DataFrame(records)
-    frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
-    return frame.dropna(subset=["timestamp"]).set_index("timestamp")
 
 @st.cache_data(ttl=600, show_spinner="Loading ENTSO-E flow observations...")
 def load_flows() -> pd.DataFrame:
@@ -137,8 +114,9 @@ learning_rate = st.select_slider(
     options=[0.001, 0.005, 0.01, 0.05, 0.1],
     value=0.01,
 )
+default_area = st.session_state.get("selected_el_region", "NO3")
 source_options = [
-    "NO3 temperature",
+    "Temperature (Open-Meteo)",
     "EUR/NOK",
     "USD/NOK",
     "ENTSO-E net flow",
@@ -150,13 +128,20 @@ selected_sources = st.multiselect(
 )
 
 exogenous_parts: list[pd.Series] = []
-if "NO3 temperature" in selected_sources:
+if "Temperature (Open-Meteo)" in selected_sources:
+    # Weather is downloaded directly from Open-Meteo for the training period.
+    weather_area = st.selectbox(
+        "Weather price area",
+        AREAS,
+        index=AREAS.index(default_area) if default_area in AREAS else 2,
+        help="Defaults to the area selected on the map page.",
+    )
     try:
-        weather = load_weather()
+        weather = load_area_weather([weather_area], training_start, training_end)
         weather_series = weather["temperature_2m"].rename("weather_temperature")
         exogenous_parts.append(weather_series)
     except Exception as exc:
-        st.error(f"Could not load selected weather data: {exc}")
+        st.error(f"Could not load temperature from Open-Meteo: {exc}")
         st.stop()
 if "EUR/NOK" in selected_sources or "USD/NOK" in selected_sources:
     try:
@@ -188,19 +173,29 @@ exogenous = (
     if exogenous_parts
     else None
 )
+
+
+@st.cache_data(show_spinner=False)
+def run_forecast(filling, exogenous, history_months, horizon, lags, learning_rate):
+    """Cached River forecast: identical inputs are not retrained."""
+    return forecast_reservoir_filling(
+        filling,
+        exogenous=exogenous,
+        selected_sources=list(exogenous.columns) if exogenous is not None else None,
+        history_months=history_months,
+        horizon=horizon,
+        lags=lags,
+        learning_rate=learning_rate,
+    )
+
+
 if st.button("Train and forecast", type="primary"):
     try:
-        result = forecast_reservoir_filling(
-            selected_filling,
-            exogenous=exogenous,
-            selected_sources=(
-                list(exogenous.columns) if exogenous is not None else None
-            ),
-            history_months=history_months,
-            horizon=horizon,
-            lags=lags,
-            learning_rate=learning_rate,
-        )
+        with st.spinner("Training the River model and forecasting..."):
+            result = run_forecast(
+                selected_filling, exogenous, history_months, horizon, lags,
+                learning_rate,
+            )
     except Exception as exc:
         st.error(f"Forecast could not be calculated: {exc}")
         st.stop()
@@ -247,7 +242,7 @@ if st.button("Train and forecast", type="primary"):
         xaxis_title="Month",
         yaxis_title="Filling fraction",
         yaxis={"range": [0, 1]},
-        template="plotly_white",
+        template="ind320",
         updatemenus=[
             {
                 "type": "buttons",
@@ -261,7 +256,7 @@ if st.button("Train and forecast", type="primary"):
             }
         ],
     )
-    st.plotly_chart(figure, use_container_width=True)
+    st.plotly_chart(figure, width="stretch")
     st.caption(
         f"Used {result.observations} monthly observations and "
         f"{result.validation_observations} one-step validation months. "

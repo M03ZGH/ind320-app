@@ -2,10 +2,10 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from ind320_app.data import load_reservoir_data
-from ind320_app.ui import render_sidebar
+from ind320_app import theme  # noqa: F401  (registers the Plotly template)
 
-render_sidebar()
+from ind320_app.data import load_reservoir_data
+
 
 # This page deliberately fetches NVE data instead of reading the old Part 1 CSV.
 st.title("NVE Reservoir Data")
@@ -40,7 +40,42 @@ area_type = st.radio("Area type", ["EL", "NO", "VASS"], horizontal=True)
 area_data = filtered[filtered["area_type"] == area_type]
 
 st.metric("Rows", f"{len(area_data):,}")
-st.dataframe(area_data, hide_index=True, use_container_width=True)
+
+# One row per area with a mini line chart (row-wise LineChartColumn) of the
+# last 12 weekly filling values, next to the latest value and capacity.
+trend_rows = []
+for number, group in area_data.sort_values("date").groupby("area_number"):
+    last = group.tail(12)
+    trend_rows.append(
+        {
+            "area_number": number,
+            "last_12_weeks_filling": last["filling_degree"].tolist(),
+            "latest_filling": group["filling_degree"].iloc[-1],
+            "capacity_TWh": group["capacity_TWh"].iloc[-1],
+        }
+    )
+if trend_rows:
+    st.subheader("Overview per area")
+    st.dataframe(
+        pd.DataFrame(trend_rows),
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "area_number": "Area",
+            "last_12_weeks_filling": st.column_config.LineChartColumn(
+                "Last 12 weeks (filling)", y_min=0, y_max=1
+            ),
+            "latest_filling": st.column_config.ProgressColumn(
+                "Latest filling", min_value=0, max_value=1, format="percent"
+            ),
+            "capacity_TWh": st.column_config.NumberColumn(
+                "Capacity (TWh)", format="%.2f"
+            ),
+        },
+    )
+
+st.subheader("Data table")
+st.dataframe(area_data, hide_index=True, width="stretch")
 
 st.subheader("Reservoir development")
 st.caption(
@@ -67,7 +102,7 @@ st.plotly_chart(
             measure: measure.replace("_", " ").title(),
             "area_number": "Area number",
         },
-        template="plotly_white",
+        template="ind320",
     ),
-    use_container_width=True,
+    width="stretch",
 )

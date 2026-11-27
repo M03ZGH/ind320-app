@@ -2,10 +2,10 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from ind320_app.data import load_reservoir_data
-from ind320_app.ui import render_sidebar
+from ind320_app import theme  # noqa: F401  (registers the Plotly template)
 
-render_sidebar()
+from ind320_app.data import load_reservoir_data
+
 
 # Capacity is not offered here because it is mostly constant and is not useful
 # as a time-series measure.
@@ -54,9 +54,9 @@ figure = px.line(
         measure: measure.replace("_", " ").title(),
         "area_number": "Area number",
     },
-    template="plotly_white",
+    template="ind320",
 )
-st.plotly_chart(figure, use_container_width=True)
+st.plotly_chart(figure, width="stretch")
 st.caption(
     "Capacity is excluded because it is largely constant for each area and "
     "does not form an informative time series."

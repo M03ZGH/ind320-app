@@ -1,4 +1,4 @@
-"""Interactive map of the available NVE weather-region boundaries."""
+"""Interactive map of NVE price areas, Norway and precipitation regions."""
 
 import json
 from datetime import date
@@ -7,13 +7,13 @@ from pathlib import Path
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from pymongo import MongoClient
+
+from ind320_app import theme  # noqa: F401  (registers the Plotly template)
 
 from ind320_app.data import load_reservoir_data
+from ind320_app.weather import AREAS, LATEST_AVAILABLE, load_area_weather
 from ind320_app.part4 import WEATHER_PROPERTIES
-from ind320_app.ui import render_sidebar
 
-render_sidebar()
 st.title("Map")
 st.caption(
     "Electricity price areas (NO1-NO5) come from the NVE bidding-area shapefile "
@@ -49,7 +49,15 @@ geojson_path = layer["file"]
 if not geojson_path.exists():
     st.error(f"{geojson_path.name} is missing. Run the conversion cell in Part 4.")
     st.stop()
-geojson = json.loads(geojson_path.read_text(encoding="utf-8"))
+
+
+@st.cache_data(show_spinner=False)
+def read_geojson(path: str) -> dict:
+    """Read a GeoJSON file once and cache the parsed result."""
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+geojson = read_geojson(str(geojson_path))
 features = geojson["features"]
 feature_key = layer["key"]
 region_codes = [feature["properties"][feature_key] for feature in features]
@@ -86,60 +94,24 @@ st.slider(
     help="Shared with the Filling Forecast page.",
 )
 
-@st.cache_data(ttl=600, show_spinner="Loading weather observations...")
-def load_weather(selected_property: str) -> pd.DataFrame:
-    if "mongo" not in st.secrets or not st.secrets["mongo"].get("uri"):
-        raise RuntimeError("Add [mongo].uri to Streamlit secrets.")
-    client = MongoClient(
-        st.secrets["mongo"]["uri"],
-        serverSelectionTimeoutMS=10000,
-        connectTimeoutMS=10000,
-    )
-    try:
-        client.admin.command("ping")
-        records = list(
-            client["ind320"]["weather"].find(
-                {}, {"_id": 0, "region": 1, "timestamp": 1, selected_property: 1}
-            )
-        )
-    finally:
-        client.close()
-    if not records:
-        raise ValueError("MongoDB contains no weather observations.")
-    frame = pd.DataFrame(records)
-    frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
-    frame[selected_property] = pd.to_numeric(frame[selected_property], errors="coerce")
-    return frame.dropna(subset=["timestamp", selected_property])
-
 @st.cache_data(ttl=3600, show_spinner="Loading NVE reservoir observations...")
 def load_filling() -> pd.DataFrame:
     return load_reservoir_data()
 
-weather = pd.DataFrame(columns=["timestamp", "region", property_name])
+# The aggregation period is chosen first; weather is then downloaded directly
+# from the Open-Meteo API for exactly that period (no database in between).
 if colour_by == "Weather property":
-    try:
-        weather = load_weather(property_name)
-    except Exception as exc:
-        st.warning(f"Could not load weather observations: {exc}")
-
-if colour_by != "Weather property":
-    date_range = (date(2024, 1, 1), date(2024, 12, 31))
-elif weather.empty:
     date_range = st.date_input(
         "Aggregation period",
         value=(date(2024, 1, 1), date(2024, 12, 31)),
+        min_value=date(2000, 1, 1),
+        max_value=LATEST_AVAILABLE,
         key="part4_map_period",
+        help="ERA5 weather is downloaded for this period (a few seconds per "
+        "year; downloads are cached). Shared with the other weather pages.",
     )
 else:
-    minimum_date = weather["timestamp"].min().date()
-    maximum_date = weather["timestamp"].max().date()
-    date_range = st.date_input(
-        "Aggregation period",
-        value=(minimum_date, maximum_date),
-        min_value=minimum_date,
-        max_value=maximum_date,
-        key="part4_map_period",
-    )
+    date_range = (date(2024, 1, 1), date(2024, 12, 31))
 if not isinstance(date_range, tuple) or len(date_range) != 2:
     st.info("Select both a start and end date.")
     st.stop()
@@ -148,18 +120,22 @@ if start_date > end_date:
     st.error("The start date must be on or before the end date.")
     st.stop()
 
+weather = pd.DataFrame()
+if colour_by == "Weather property":
+    if (end_date - start_date).days > 5 * 366:
+        st.info("Long periods need one download per year and area; this may take a while.")
+    try:
+        weather = load_area_weather(AREAS, start_date, end_date)
+    except Exception as exc:
+        st.warning(f"Could not load weather from Open-Meteo: {exc}")
 selected_weather = weather
-if not weather.empty:
-    selected_weather = weather[
-        weather["timestamp"].dt.date.between(start_date, end_date)
-    ]
 region_values: dict[str, float] = {}
 value_label, value_unit = "", ""
 if colour_by == "Weather property":
     value_label = f"Mean {WEATHER_PROPERTIES[property_name][0].lower()}"
     value_unit = WEATHER_PROPERTIES[property_name][1]
     if feature_key == "EL":
-        # The MongoDB weather documents are labelled by price area (e.g. "NO3").
+        # Weather is downloaded per price area (NO1-NO5); average over the period.
         for region, group in selected_weather.groupby("region"):
             if str(region) in region_codes:
                 region_values[str(region)] = float(group[property_name].mean())
@@ -246,12 +222,12 @@ figure.update_layout(
         "zoom": 3.2,
     },
     height=650,
-    template="plotly_white",
+    template="ind320",
     margin={"l": 0, "r": 0, "t": 20, "b": 0},
 )
 map_state = st.plotly_chart(
     figure,
-    use_container_width=True,
+    width="stretch",
     key=f"map_{feature_key}",
     on_select="rerun",
     selection_mode="points",
@@ -275,12 +251,12 @@ else:
 if colour_by == "Reservoir filling":
     pass
 elif feature_key == "EL":
-    st.info(
-        "Only NO3 weather data is currently published, so only the NO3 polygon "
-        "is coloured. The other price areas are shown as outlines."
+    st.caption(
+        "Weather is downloaded from Open-Meteo (ERA5) for a few random "
+        "locations inside each price area and averaged over the chosen period."
     )
 elif feature_key == "REGION":
     st.info(
-        "Weather data is stored per price area, not per precipitation region, "
+        "Weather is downloaded per price area, not per precipitation region, "
         "so this layer shows outlines only. Switch to Price area (EL) for values."
     )
