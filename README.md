@@ -105,10 +105,12 @@ source .venv/bin/activate
 streamlit run main.py
 ```
 
-The NVE and currency pages work without local database secrets. The cross-border,
-weather map, weather analysis, correlation and exogenous-data forecast pages
-additionally need `[mongo].uri` in `.streamlit/secrets.toml`. The map currently
-draws the converted price-area (`Budområder.shp`), Norway and weather-region GeoJSON
+The NVE, currency, weather map, weather analysis, correlation and forecast pages work
+without database secrets: weather is downloaded directly from the Open-Meteo archive
+API (`src/ind320_app/weather.py`: 5 random points per price area, one cached request per
+calendar year, progress bar and readable rate-limit errors). Only the cross-border
+flow page and the ENTSO-E exogenous option of the forecast need `[mongo].uri` in
+`.streamlit/secrets.toml`. The map currently draws the converted price-area (`Budområder.shp`), Norway and weather-region GeoJSON
 files in `data/`. VASS (water-area) polygons are not included, so VASS is not drawn.
 The Part 4 notebook samples 100 random weather points per price area instead of
 the 1000 asked for, because of Open-Meteo API limits (downloads are cached in
@@ -129,7 +131,7 @@ The notebook and the Streamlit app use different data destinations:
 4. The notebook writes the fresh, Spark-curated observations to MongoDB with
    batched, idempotent upserts and a unique index.
 5. The notebook publishes aggregated Part 3 weather observations to MongoDB.
-6. Streamlit reads MongoDB on the cross-border and weather pages.
+6. Streamlit reads MongoDB on the cross-border page (and for the ENTSO-E forecast input); weather comes straight from Open-Meteo.
 
 The ENTSO-E cell requests the latest two years for four selected Norwegian
 connections in both directions. Requests are split into one-year windows and
