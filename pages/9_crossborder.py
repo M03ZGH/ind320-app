@@ -1,10 +1,10 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from pymongo import MongoClient
-from ind320_app.ui import render_sidebar
 
-render_sidebar()
+from ind320_app import theme  # noqa: F401  (registers the Plotly template)
+from pymongo import MongoClient
+
 
 st.title("Cross-Border Electricity Flows")
 st.caption(
@@ -77,7 +77,7 @@ with left:
             values="energy_mwh",
             title=f"{connection} – {year} (MWh estimate)",
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
 with right:
@@ -98,8 +98,9 @@ with right:
             y="flow_mw",
             color="direction",
             title=f"{connection} – selected months",
+            template="ind320",
         ),
-        use_container_width=True,
+        width="stretch",
     )
 
 with st.expander("Data source and methodology"):

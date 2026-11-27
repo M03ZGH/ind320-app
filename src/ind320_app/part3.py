@@ -82,7 +82,11 @@ def sample_region_coordinates(
         raise ValueError("points_per_region must be positive.")
     regions = gpd.read_file(shapefile)
     name_column = next(
-        (column for column in ("REGION", "region", "NAME", "name") if column in regions),
+        (
+            column
+            for column in ("REGION", "region", "NAME", "name", "budomr")
+            if column in regions
+        ),
         None,
     )
     if name_column is None:
@@ -96,6 +100,9 @@ def sample_region_coordinates(
     result: dict[str, list[tuple[float, float]]] = {}
     for index, multipoint in sampled.items():
         name = str(regions_wgs84.loc[index, name_column])
+        # The bidding-area layer labels areas "NO 3"; use the app's "NO3" key.
+        if name.upper().startswith("NO "):
+            name = name.replace(" ", "")
         result[name] = [(point.x, point.y) for point in multipoint.geoms]
     return result
 
@@ -103,17 +110,20 @@ def sample_region_coordinates(
 def _find_region(
     coordinates: dict[str, list[tuple[float, float]]], region: str
 ) -> list[tuple[float, float]]:
-    # The Atlas layer uses precipitation-region codes. The course mapping
-    # combines RM+RN for North and RS+RØ for East.
+    # Electricity price areas (NO1-NO5) must come from the bidding-area
+    # polygons. An exact key is therefore always preferred; the aliases are
+    # only a fallback for the older precipitation-region layer. NO3 has no
+    # alias: precipitation region RM covers only about half of NO3.
+    if coordinates.get(region):
+        return list(coordinates[region])
     aliases = {
-        "NO1": ("NO1", "RØ", "RÃ", "Øst", "East"),
-        "NO2": ("NO2", "RS", "Sør", "South"),
-        "NO3": ("NO3", "RM", "Midt", "Middle"),
-        "NO4": ("NO4", "RM", "RN", "RM+RN", "North"),
-        "NO5": ("NO5", "RV", "Vest", "West"),
+        "NO1": ("RØ", "RÃ", "Øst", "East"),
+        "NO2": ("RS", "Sør", "South"),
+        "NO4": ("RN", "North"),
+        "NO5": ("RV", "Vest", "West"),
     }
     points: list[tuple[float, float]] = []
-    for key in (region, *aliases.get(region, ())):
+    for key in aliases.get(region, ()):
         points.extend(coordinates.get(key, []))
     if points:
         return points

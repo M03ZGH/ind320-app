@@ -21,6 +21,7 @@ dependencies = [
     "pymongo>=4.19.0",
     "pyspark==3.5.8",
     "requests>=2.31.0",
+    "river>=0.22.0",
     "scikit-learn>=1.5",
     "scipy>=1.13",
     "setuptools<70",

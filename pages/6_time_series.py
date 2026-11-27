@@ -1,13 +1,13 @@
 """STL and spectrogram analyses for reservoir filling."""
 
-import matplotlib.pyplot as plt
 import streamlit as st
 
 from ind320_app.data import load_reservoir_data
-from ind320_app.part3 import plot_spectrogram, plot_stl
-from ind320_app.ui import render_sidebar
+from ind320_app.part4 import (
+    plot_spectrogram_interactive,
+    plot_stl_interactive,
+)
 
-render_sidebar()
 
 st.title("Time-Series Analysis")
 st.caption(
@@ -15,8 +15,12 @@ st.caption(
     "weekly and analysed with STL and a spectrogram."
 )
 
+@st.cache_data(ttl=3600, show_spinner="Loading NVE reservoir observations...")
+def load_cached_reservoir_data():
+    return load_reservoir_data()
+
 try:
-    reservoirs = load_reservoir_data()
+    reservoirs = load_cached_reservoir_data()
 except Exception as exc:
     st.error(f"Could not retrieve data from NVE: {exc}")
     st.stop()
@@ -35,6 +39,20 @@ series = (
     .dropna()
 )
 
+
+
+@st.cache_data(show_spinner="Computing STL decomposition...")
+def cached_stl(values, seasonal, robust):
+    return plot_stl_interactive(values, seasonal=seasonal, robust=robust)
+
+
+@st.cache_data(show_spinner="Computing spectrogram...")
+def cached_spectrogram(values, window_length, overlap):
+    return plot_spectrogram_interactive(
+        values, window_length=window_length, overlap=overlap
+    )
+
+
 stl_tab, spectrogram_tab = st.tabs(["STL decomposition", "Spectrogram"])
 with stl_tab:
     seasonal = st.number_input(
@@ -44,31 +62,28 @@ with stl_tab:
         value=13,
         step=2,
     )
-    trend_choice = st.selectbox(
-        "Trend smoother (weeks)",
-        options=["Automatic", 53, 55, 57, 59, 61],
-        help=(
-            "For weekly data, a manual trend smoother must be an odd number "
-            "larger than the 52-week seasonal period."
-        ),
-    )
-    trend = None if trend_choice == "Automatic" else trend_choice
     robust = st.checkbox("Robust fitting", value=True)
     if seasonal % 2 == 0:
         st.warning("The seasonal smoother must be odd.")
     else:
-        figure = plot_stl(series, seasonal=seasonal, trend=trend, robust=robust)
-        st.pyplot(figure)
-        plt.close(figure)
+        try:
+            figure = cached_stl(series, seasonal, robust)
+        except ValueError as exc:
+            st.warning(str(exc))
+        else:
+            st.plotly_chart(figure, width="stretch")
 
 with spectrogram_tab:
     window = st.number_input(
         "Window length (weeks)", min_value=4, max_value=max(4, len(series)), value=min(52, len(series)), step=1
     )
     overlap = st.slider("Window overlap", 0.0, 0.9, 0.5, 0.05)
-    figure = plot_spectrogram(series, window_length=window, overlap=overlap)
-    st.pyplot(figure)
-    plt.close(figure)
+    try:
+        figure = cached_spectrogram(series, window, overlap)
+    except ValueError as exc:
+        st.warning(str(exc))
+    else:
+        st.plotly_chart(figure, width="stretch")
     st.caption(
         "Bright areas show stronger periodic components. Low frequencies represent "
         "slow seasonal variation, while higher frequencies represent shorter-term "

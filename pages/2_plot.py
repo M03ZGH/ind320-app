@@ -1,11 +1,11 @@
-import matplotlib.pyplot as plt
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
-from ind320_app.data import load_reservoir_data
-from ind320_app.ui import render_sidebar
+from ind320_app import theme  # noqa: F401  (registers the Plotly template)
 
-render_sidebar()
+from ind320_app.data import load_reservoir_data
+
 
 # Capacity is not offered here because it is mostly constant and is not useful
 # as a time-series measure.
@@ -22,9 +22,13 @@ measure = st.selectbox(
     ["filling_degree", "filled_TWh", "change_filling_degree"],
 )
 
+@st.cache_data(ttl=3600, show_spinner="Loading NVE reservoir observations...")
+def load_cached_reservoir_data() -> pd.DataFrame:
+    return load_reservoir_data()
+
 # Keep the error visible to the user when the public API is unavailable.
 try:
-    data = load_reservoir_data()
+    data = load_cached_reservoir_data()
 except Exception as exc:
     st.error(f"Could not retrieve data from NVE: {exc}")
     st.stop()
@@ -38,17 +42,21 @@ if filtered.empty:
     st.warning("No observations are available for this selection.")
     st.stop()
 
-figure, axis = plt.subplots(figsize=(11, 5))
-# Compare the development of each area number over the selected interval.
-for area_number, group in filtered.groupby("area_number"):
-    axis.plot(group["date"], group[measure], label=str(area_number))
-axis.set_title(f"{measure.replace('_', ' ').title()} – {area_type}")
-axis.set_xlabel("Date")
-axis.set_ylabel(measure.replace("_", " ").title())
-axis.grid(True, alpha=0.3)
-axis.legend(title="Area number", ncol=3)
-figure.tight_layout()
-st.pyplot(figure)
+figure = px.line(
+    filtered.sort_values("date"),
+    x="date",
+    y=measure,
+    color="area_number",
+    markers=True,
+    title=f"{measure.replace('_', ' ').title()} – {area_type}",
+    labels={
+        "date": "Date",
+        measure: measure.replace("_", " ").title(),
+        "area_number": "Area number",
+    },
+    template="ind320",
+)
+st.plotly_chart(figure, width="stretch")
 st.caption(
     "Capacity is excluded because it is largely constant for each area and "
     "does not form an informative time series."
